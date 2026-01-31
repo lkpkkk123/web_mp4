@@ -1,6 +1,4 @@
-import pino from 'pino';
-import path from 'path';
-import fs from 'fs';
+// Simplified logger implementation to avoid dependency issues
 
 export interface LoggerConfig {
   /**
@@ -22,96 +20,48 @@ export interface LoggerConfig {
 }
 
 export class Logger {
-  private logger: pino.Logger;
+  private level: string;
 
-  constructor(config: LoggerConfig) {
-    const {
-      level = 'info',
-      filePath,
-      logToConsole = true,
-      limitSize = '10m',
-      limitCount = 5,
-    } = config;
-
-    const targets: pino.TransportTargetOptions[] = [];
-
-    // Add console target if enabled
-    if (logToConsole) {
-      targets.push({
-        target: 'pino-pretty', // Use pino-pretty for readable terminal output
-        options: {
-          colorize: true,
-          translateTime: 'SYS:yyyy-mm-dd HH:MM:ss.l', // Human-readable time
-          ignore: 'pid,hostname', // Clean up output
-        },
-        level: level,
-      });
-    }
-
-    // Add file target if path is provided
-    if (filePath) {
-      // Ensure directory exists
-      const dir = path.dirname(filePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-
-      targets.push({
-        target: path.join(__dirname, 'formatted-roll.js'), // Point to the compiled JS file in dist/
-        options: {
-          file: filePath,
-          size: limitSize,
-          limit: {
-            count: limitCount,
-          },
-          mkdir: true,
-          // pino-pretty options pass-through
-          colorize: false,
-          translateTime: 'SYS:yyyy-mm-dd HH:MM:ss.l',
-          ignore: 'pid,hostname',
-        },
-        level: level,
-      });
-    }
-
-    // Create the transport
-    const transport = pino.transport({
-      targets: targets,
-    });
-
-    // Initialize pino with the transport
-    this.logger = pino(
-      {
-        level: level,
-        timestamp: pino.stdTimeFunctions.isoTime, // Standard ISO time for raw JSON logs (file)
-      },
-      transport
-    );
+  constructor(config?: LoggerConfig) {
+    this.level = (config?.level || 'info').toLowerCase();
   }
 
   public debug(msg: string, ...args: any[]): void {
-    this.logger.debug(msg, ...args);
+    if (this.shouldLog('debug')) {
+      console.debug('[DEBUG]', msg, ...args);
+    }
   }
 
   public info(msg: string, ...args: any[]): void {
-    this.logger.info(msg, ...args);
+    if (this.shouldLog('info')) {
+      console.info('[INFO]', msg, ...args);
+    }
   }
 
   public warn(msg: string, ...args: any[]): void {
-    this.logger.warn(msg, ...args);
+    if (this.shouldLog('warn')) {
+      console.warn('[WARN]', msg, ...args);
+    }
   }
 
   public error(msg: string, ...args: any[]): void {
-    this.logger.error(msg, ...args);
+    if (this.shouldLog('error')) {
+      console.error('[ERROR]', msg, ...args);
+    }
   }
 
   public fatal(msg: string, ...args: any[]): void {
-    this.logger.fatal(msg, ...args);
+    if (this.shouldLog('fatal')) {
+      console.error('[FATAL]', msg, ...args);
+    }
   }
 
-  // Expose raw pino instance if needed
-  public getRawLogger(): pino.Logger {
-    return this.logger;
+  private shouldLog(level: string): boolean {
+    const levels = ['debug', 'info', 'warn', 'error', 'fatal'];
+    const currentLevelIndex = levels.indexOf(this.level);
+    const testLevelIndex = levels.indexOf(level);
+    
+    return testLevelIndex >= currentLevelIndex;
   }
 }
 
